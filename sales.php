@@ -443,6 +443,56 @@ class Sales
         return $stmt->rowCount() > 0 ? json_encode($stmt->fetchAll(PDO::FETCH_ASSOC)) : 0;
     }
 
+    function getMonthlySales()
+    {
+        include "connection.php";
+
+        // Get the current month and year
+        $currentMonth = date('m');
+        $currentYear = date('Y');
+
+        // Initialize an array to hold the results
+        $monthlySales = [];
+
+        // Loop through each month for the past year
+        for ($i = 0; $i < 12; $i++) {
+            // Calculate the month and year for the current iteration
+            $month = $currentMonth - $i;
+            $year = $currentYear;
+            if ($month <= 0) {
+                $month += 12;
+                $year--;
+            }
+
+            // Format the month and year for SQL query
+            $firstDayOfMonth = "$year-" . str_pad($month, 2, '0', STR_PAD_LEFT) . "-01";
+            $lastDayOfMonth = date("Y-m-t", strtotime($firstDayOfMonth));
+
+            // Prepare the SQL query
+            $sql = "SELECT SUM(sale_totalAmount) AS totalAmount 
+            FROM tbl_sales 
+            WHERE sale_date >= :firstDayOfMonth AND sale_date <= :lastDayOfMonth";
+            $stmt = $conn->prepare($sql);
+            $stmt->bindParam(":firstDayOfMonth", $firstDayOfMonth);
+            $stmt->bindParam(":lastDayOfMonth", $lastDayOfMonth);
+            $stmt->execute();
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            // Add the result to the array with the month name
+            $monthlySales[] = [
+                'month' => date('M', strtotime($firstDayOfMonth)), // Short month name (e.g., 'Jan')
+                'totalAmount' => $result['totalAmount'] ? $result['totalAmount'] : 0
+            ];
+        }
+
+        // Reverse the array to have chronological order (oldest month first)
+        $monthlySales = array_reverse($monthlySales);
+
+        // Return the result as JSON
+        return json_encode($monthlySales);
+    }
+
+
 
 } //user
 
@@ -497,6 +547,9 @@ switch ($operation) {
         break;
     case "getShiftAdminReport":
         echo $sales->getShiftAdminReport($json);
+        break;
+    case "getMonthlySales":
+        echo $sales->getMonthlySales();
         break;
 
     // case "getZAllReport":
